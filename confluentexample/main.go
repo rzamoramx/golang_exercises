@@ -47,8 +47,7 @@ func main() {
 		}
 	}()
 
-	// run producer
-	producer()
+	//producer()
 
 	consumer()
 }
@@ -93,11 +92,16 @@ func producer() {
 			Count: n}
 		recordValue, _ := json.Marshal(&data)
 		fmt.Printf("Preparing to produce record: %s\t%s\n", recordKey, recordValue)
-		producerC.Produce(&kafka.Message{
+
+		err := producerC.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Key:            []byte(recordKey),
 			Value:          []byte(recordValue),
 		}, nil)
+
+		if err != nil {
+			fmt.Printf("Error to produce message: %v", err)
+		}
 	}
 
 	// Wait for all messages to be delivered
@@ -130,6 +134,7 @@ func consumer() {
 			msg, err := consumerC.ReadMessage(100 * time.Millisecond)
 			if err != nil {
 				// Errors are informational and automatically handled by the consumer
+				fmt.Printf("Failed to read message: %v\n", err)
 				continue
 			}
 			recordKey := string(msg.Key)
