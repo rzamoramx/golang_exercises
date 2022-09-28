@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gopkg.in/confluentinc/confluent-kafka-go.v1/kafka"
 )
@@ -11,6 +14,7 @@ import (
 var (
 	topic     = "topic_0"
 	producerC *kafka.Producer
+	consumerC *kafka.Consumer
 )
 
 // https://github.com/confluentinc/examples/blob/7.2.1-post/clients/cloud/go/producer.go
@@ -25,6 +29,7 @@ type RecordValue struct {
 func main() {
 	// Create Producer instance
 	producerC = instanceProducer()
+	consumerC = instanceConsumer()
 
 	// Go-routine to handle message delivery reports and
 	// possibly other event types (errors, stats, etc)
@@ -43,7 +48,9 @@ func main() {
 	}()
 
 	// run producer
-	go producer()
+	producer()
+
+	consumer()
 }
 
 func instanceProducer() *kafka.Producer {
@@ -61,6 +68,24 @@ func instanceProducer() *kafka.Producer {
 	return p
 }
 
+func instanceConsumer() *kafka.Consumer {
+	c, err := kafka.NewConsumer(&kafka.ConfigMap{
+		"bootstrap.servers": "pkc-3w22w.us-central1.gcp.confluent.cloud:909",
+		"sasl.mechanisms":   "PLAIN",
+		"security.protocol": "SASL_SSL",
+		"sasl.username":     "XCBOZPRUIH4HQGXP",
+		"sasl.password":     "ShDVNow4/6PEREV1MkGIjQhoXXk3kFvKfbx2htZv2btqKfETRYOOYWwWMqC9hO2R",
+		"group.id":          "go_example_group_1", // es arbitrario?
+		"auto.offset.reset": "earliest",
+	})
+	if err != nil {
+		fmt.Printf("Failed to create consumer: %s", err)
+		os.Exit(1)
+	}
+
+	return c
+}
+
 func producer() {
 	for n := 0; n < 10; n++ {
 		recordKey := "alice"
@@ -69,7 +94,7 @@ func producer() {
 		recordValue, _ := json.Marshal(&data)
 		fmt.Printf("Preparing to produce record: %s\t%s\n", recordKey, recordValue)
 		producerC.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: 1}, // kafka.PartitionAny},
+			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Key:            []byte(recordKey),
 			Value:          []byte(recordValue),
 		}, nil)
@@ -81,4 +106,46 @@ func producer() {
 	fmt.Printf("10 messages were produced to topic %s!", topic)
 
 	producerC.Close()
+}
+
+func consumer() {
+	// Subscribe to topic
+	err := consumerC.SubscribeTopics([]string{topic}, nil)
+	if err != nil {
+		fmt.Printf("failed to subscribe: %s", err)
+	}
+	// Set up a channel for handling Ctrl-C, etc
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
+
+	// Process messages
+	totalCount := 0
+	run := true
+	for run == true {
+		select {
+		case sig := <-sigchan:
+			fmt.Printf("Caught signal %v: terminating\n", sig)
+			run = false
+		default:
+			msg, err := consumerC.ReadMessage(100 * time.Millisecond)
+			if err != nil {
+				// Errors are informational and automatically handled by the consumer
+				continue
+			}
+			recordKey := string(msg.Key)
+			recordValue := msg.Value
+			data := RecordValue{}
+			err = json.Unmarshal(recordValue, &data)
+			if err != nil {
+				fmt.Printf("Failed to decode JSON at offset %d: %v", msg.TopicPartition.Offset, err)
+				continue
+			}
+			count := data.Count
+			totalCount += count
+			fmt.Printf("Consumed record with key %s and value %s, and updated total count to %d\n", recordKey, recordValue, totalCount)
+		}
+	}
+
+	fmt.Printf("Closing consumer\n")
+	consumerC.Close()
 }
