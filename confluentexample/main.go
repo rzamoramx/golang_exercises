@@ -12,9 +12,14 @@ import (
 )
 
 var (
-	topic     = "topic_0"
-	producerC *kafka.Producer
-	consumerC *kafka.Consumer
+	topic      = "topic_0"
+	producerC  *kafka.Producer
+	consumerC  *kafka.Consumer
+	mechanisms = "PLAIN"
+	protocol   = "SASL_SSL"
+	username   = "username"
+	password   = "password"
+	server     = "server:9092"
 )
 
 // https://github.com/confluentinc/examples/blob/7.2.1-post/clients/cloud/go/producer.go
@@ -47,18 +52,18 @@ func main() {
 		}
 	}()
 
-	//producer()
+	go producer()
 
 	consumer()
 }
 
 func instanceProducer() *kafka.Producer {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": "pkc-3w22w.us-central1.gcp.confluent.cloud:909",
-		"sasl.mechanisms":   "PLAIN",
-		"security.protocol": "SASL_SSL",
-		"sasl.username":     "XCBOZPRUIH4HQGXP",
-		"sasl.password":     "ShDVNow4/6PEREV1MkGIjQhoXXk3kFvKfbx2htZv2btqKfETRYOOYWwWMqC9hO2R"})
+		"bootstrap.servers": server,
+		"sasl.mechanisms":   mechanisms,
+		"security.protocol": protocol,
+		"sasl.username":     username,
+		"sasl.password":     password})
 	if err != nil {
 		fmt.Printf("Failed to create producer: %s", err)
 		os.Exit(1)
@@ -69,11 +74,11 @@ func instanceProducer() *kafka.Producer {
 
 func instanceConsumer() *kafka.Consumer {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
-		"bootstrap.servers": "pkc-3w22w.us-central1.gcp.confluent.cloud:909",
-		"sasl.mechanisms":   "PLAIN",
-		"security.protocol": "SASL_SSL",
-		"sasl.username":     "XCBOZPRUIH4HQGXP",
-		"sasl.password":     "ShDVNow4/6PEREV1MkGIjQhoXXk3kFvKfbx2htZv2btqKfETRYOOYWwWMqC9hO2R",
+		"bootstrap.servers": server,
+		"sasl.mechanisms":   mechanisms,
+		"security.protocol": protocol,
+		"sasl.username":     username,
+		"sasl.password":     password,
 		"group.id":          "go_example_group_1", // es arbitrario?
 		"auto.offset.reset": "earliest",
 	})
@@ -134,7 +139,7 @@ func consumer() {
 			msg, err := consumerC.ReadMessage(100 * time.Millisecond)
 			if err != nil {
 				// Errors are informational and automatically handled by the consumer
-				fmt.Printf("Failed to read message: %v\n", err)
+				//fmt.Printf("Failed to read message: %v\n", err)
 				continue
 			}
 			recordKey := string(msg.Key)
