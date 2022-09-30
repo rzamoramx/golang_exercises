@@ -15,7 +15,6 @@ import (
 
 var (
 	topic     = "topic_1"
-	producerC *kafka.Producer
 	consumerC *kafka.Consumer
 	conf      map[string]string
 )
@@ -34,34 +33,11 @@ func main() {
 	conf = readCCloudConfig("confluent.secret")
 	fmt.Printf("map conf: %+v\n", conf)
 
-	// Create Producer instance
-	producerC = instanceProducer()
+	// Create instance
 	consumerC = instanceConsumer()
-
-	// Goroutine to handle message delivery reports and
-	// possibly other event types (errors, stats, etc)
-	//handler()
-
-	// Produce messages in goroutine
-	go producer()
 
 	// Get messages
 	consumer()
-}
-
-func instanceProducer() *kafka.Producer {
-	p, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": conf["bootstrap.servers"],
-		"sasl.mechanisms":   conf["sasl.mechanisms"],
-		"security.protocol": conf["security.protocol"],
-		"sasl.username":     conf["sasl.username"],
-		"sasl.password":     conf["sasl.password"]})
-	if err != nil {
-		fmt.Printf("Failed to create producer: %s\n", err)
-		os.Exit(1)
-	}
-
-	return p
 }
 
 func instanceConsumer() *kafka.Consumer {
@@ -79,37 +55,6 @@ func instanceConsumer() *kafka.Consumer {
 	}
 
 	return c
-}
-
-func producer() {
-	for n := 0; n < 1; n++ {
-		recordKey := "alice"
-		data := &RecordValue{
-			Count:     n,
-			Timestamp: time.Now().UnixNano() / int64(time.Millisecond),
-			Foo:       "Bar"}
-		recordValue, _ := json.Marshal(&data)
-		fmt.Printf("Preparing to produce record: %s\t%s\n", recordKey, recordValue)
-
-		err := producerC.Produce(&kafka.Message{
-			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
-			Key:            []byte(recordKey),
-			Value:          []byte(recordValue),
-		}, nil)
-
-		if err != nil {
-			fmt.Printf("Error to produce message: %v\n", err)
-		}
-	}
-
-	fmt.Printf("PRODUCER: %s\n", time.Now().String())
-
-	// Wait for all messages to be delivered
-	producerC.Flush(5 * 1000)
-
-	fmt.Printf("messages were produced to topic %s!\n", topic)
-
-	producerC.Close()
 }
 
 func consumer() {
@@ -155,22 +100,6 @@ func consumer() {
 
 	fmt.Printf("Closing consumer\n")
 	consumerC.Close()
-}
-
-func handler() {
-	go func() {
-		for e := range producerC.Events() {
-			switch ev := e.(type) {
-			case *kafka.Message:
-				if ev.TopicPartition.Error != nil {
-					fmt.Printf("Failed to deliver message: %v\n", ev.TopicPartition)
-				} else {
-					fmt.Printf("Successfully produced record to topic %s partition [%d] @ offset %v\n",
-						*ev.TopicPartition.Topic, ev.TopicPartition.Partition, ev.TopicPartition.Offset)
-				}
-			}
-		}
-	}()
 }
 
 func readCCloudConfig(configFile string) map[string]string {
