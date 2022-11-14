@@ -105,11 +105,13 @@ func producer() {
 	fmt.Printf("PRODUCER: %s\n", time.Now().String())
 
 	// Wait for all messages to be delivered
-	producerC.Flush(5 * 1000)
+	// We use a goroutine for non blocking flushing
+	go func() {
+		producerC.Flush(5 * 1000)
+		fmt.Printf("messages were produced to topic %s!\n", topic)
 
-	fmt.Printf("messages were produced to topic %s!\n", topic)
-
-	producerC.Close()
+		producerC.Close()
+	}()
 }
 
 func consumer() {
