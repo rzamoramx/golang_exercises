@@ -2,11 +2,18 @@ package main
 
 import (
 	"datastructures/algos"
+	"datastructures/slices"
 	"fmt"
 	"math/rand"
 )
 
 func main() {
+	dataStrucutres()
+	fmt.Println("---------------------- Slices -----------------------")
+	slices.SlicesInDepth()
+}
+
+func dataStrucutres() {
 	fmt.Println("-----------------------Linked Lists---------------------------")
 	linkedList := algos.LinkedList{}
 	for i := 0; i < 10; i++ {
